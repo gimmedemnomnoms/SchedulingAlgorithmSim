@@ -13,9 +13,10 @@ public class Schedule {
         //RRSched rrSched = new RRSched(procs);
         //rrSched.runRRSim();
         //printProcessStats();
-        FBSched fbSched = new FBSched(procs);
-        fbSched.runFBSim();
-        printProcessStats();
+        //FBSched fbSched = new FBSched(procs);
+        //fbSched.runFBSim();
+        //printProcessStats();
+        readScheduleType();
 
 
     }
@@ -45,10 +46,52 @@ public class Schedule {
 
     }
 
+    public static void readScheduleType() throws IOException {
+        FileReader in = new FileReader("./src/SPN.sf");
+        BufferedReader reader = new BufferedReader(in);
+        String scheduleType = reader.readLine();
+        System.out.println(scheduleType);
+        switch (scheduleType) {
+            case "FCFS":
+                FCFSSched fcfsSched = new FCFSSched(procs);
+                fcfsSched.runSim();
+                printProcessStats();
+                break;
+            case "RR":
+                String quantumLine = reader.readLine();
+                int quantum = Integer.parseInt(quantumLine.substring(quantumLine.lastIndexOf("=") + 1));
+                System.out.println(quantum);
+                RRSched rrSched = new RRSched(procs, quantum);
+                rrSched.runRRSim();
+                printProcessStats();
+                break;
+            case "FEEDBACK":
+                String prioritiesLine = reader.readLine();
+                int numPriorities = Integer.parseInt(prioritiesLine.substring(prioritiesLine.lastIndexOf("=") + 1));
+                quantumLine = reader.readLine();
+                quantum = Integer.parseInt(quantumLine.substring(quantumLine.lastIndexOf("=") + 1));
+                System.out.println(numPriorities);
+                System.out.println(quantum);
+                FBSched fbSched = new FBSched(procs, numPriorities, quantum);
+                fbSched.runFBSim();
+                printProcessStats();
+                break;
+            case "SPN":
+                String service = reader.readLine();
+                boolean serviceGiven = Boolean.parseBoolean(service.substring(service.lastIndexOf("=") + 1));
+                String alphaLine = reader.readLine();
+                double alpha = Double.parseDouble(alphaLine.substring(alphaLine.lastIndexOf("=") + 1));
+                System.out.println(serviceGiven);
+                System.out.println(alpha);
+                break;
+        }
+    }
     public static List<Process> readProcesses() throws IOException {
-        FileInputStream fstream = new FileInputStream("C:\\Users\\alina\\Documents\\Classes\\Fall 2023\\Operating Systems\\Project 3\\scheduling\\src\\medium.txt");
-        DataInputStream input = new DataInputStream(fstream);
-        BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+        //File inputFile = new File("./src/medium.txt");
+        FileReader in = new FileReader(new File("./src/medium.txt"));
+        //FileInputStream fstream = new FileInputStream("C:\\Users\\alina\\Documents\\Classes\\Fall 2023\\Operating Systems\\Project 3\\scheduling\\src\\medium.txt");
+        //DataInputStream input = new DataInputStream(fstream);
+        BufferedReader reader = new BufferedReader(in);
         String lineRead;
         int processNum = 0;
         while ((lineRead = reader.readLine()) != null) {
@@ -209,11 +252,12 @@ public class Schedule {
         EventQueue eventQueue;
         int runningTime;
         Process running;
-        int quantum = 3;
+        int quantum;
 
 
-        RRSched(List<Process> procs) {
+        RRSched(List<Process> procs, int quantum) {
             this.procs = procs;
+            this.quantum = quantum;
             this.rq = new ArrayList<>();
             this.clock = 0;
             this.eventQueue = new EventQueue();
@@ -230,12 +274,12 @@ public class Schedule {
                 for (int i = 0; i < p.activities.size(); i++){
                     System.out.println("PRINTING MODDED");
                     if (i % 2 == 0) {
-                        if(p.activities.get(i) > quantum) {
+                        if(p.activities.get(i) > this.quantum) {
                             int rem = p.activities.get(i);
-                            while (rem > quantum) {
-                                moddedactivities.add(quantum);
-                                System.out.println("1Added " + quantum);
-                                rem -= quantum;
+                            while (rem > this.quantum) {
+                                moddedactivities.add(this.quantum);
+                                System.out.println("1Added " + this.quantum);
+                                rem -= this.quantum;
                                 moddedactivities.add(0);
                                 System.out.println("added blocking for 0 ");
                             }
@@ -346,11 +390,13 @@ public class Schedule {
         EventQueue eventQueue;
         int runningTime;
         Process running;
-        int quantum = 3;
-        int num_priorities = 3;
+        int quantum;
+        int num_priorities;
 
-        FBSched(List<Process> procs) {
+        FBSched(List<Process> procs, int num_priorities, int quantum) {
             this.procs = procs;
+            this.num_priorities = num_priorities;
+            this.quantum = quantum;
             this.queues = new ArrayList<>();
             this.rq = new ArrayList<>();
             this.clock = 0;
