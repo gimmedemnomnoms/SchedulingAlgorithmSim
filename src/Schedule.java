@@ -83,6 +83,9 @@ public class Schedule {
                 double alpha = Double.parseDouble(alphaLine.substring(alphaLine.lastIndexOf("=") + 1));
                 System.out.println(serviceGiven);
                 System.out.println(alpha);
+                SPNSched spnSched = new SPNSched(procs, serviceGiven, alpha);
+                spnSched.runSim();
+                printProcessStats();
                 break;
         }
     }
@@ -99,7 +102,6 @@ public class Schedule {
             String[] splitLine = lineRead.split(" ");
             loadProcess(procs, processNum, splitLine);
             processNum++;
-
         }
         return procs;
     }
@@ -145,6 +147,7 @@ public class Schedule {
         int arrive;
         List<Integer> activities = new ArrayList<>();
         int queueNum = 0;
+        double sVal = 0;
 
         public Process(int pid) {
             this.pid = pid;
@@ -620,6 +623,141 @@ public class Schedule {
                     System.out.println("if not running and rq is empty");
                     this.debug("Current Ready Queue: " + this.rq);
                     Process p = this.rq.remove(0);
+                    p.stats.totalResponseTime = p.stats.totalResponseTime + (this.clock - p.stats.lastReady);
+                    p.stats.numResponseTimes = p.stats.numResponseTimes + 1;
+                    int cpuTime = p.activities.remove(0);
+                    p.stats.serviceTime = p.stats.serviceTime + cpuTime;
+                    if (p.stats.startTime == null) {
+                        p.stats.startTime = this.clock;
+                    }
+                    this.runningTime = cpuTime;
+                    this.running = p;
+                    this.debug("Dispatching process " + p.pid);
+                }
+            }
+            System.out.println("\n\nSimulation Complete\n-----------------------");
+        }
+    }
+
+    static class SPNSched {
+        List<Process> procs;
+        List<Process> rq;
+        int clock;
+        EventQueue eventQueue;
+        int runningTime;
+        Process running;
+        boolean serviceGiven;
+        double alpha;
+
+
+        SPNSched(List<Process> procs, boolean serviceGiven, double alpha) {
+            this.procs = procs;
+            this.serviceGiven = serviceGiven;
+            this.alpha = alpha;
+            this.rq = new ArrayList<>();
+            this.clock = 0;
+            this.eventQueue = new EventQueue();
+            this.runningTime = 0;
+            this.running = null;
+
+            for (Process p : this.procs) {
+                this.eventQueue.push(new Event(EventType.ARRIVAL, p, p.arrive));
+                p.stats = new Stats(p.arrive);
+                System.out.println("p.stats is " + p.arrive);
+            }
+        }
+
+        void debug (String msg) {
+            System.out.println(this.clock + " " + msg);
+        }
+
+        void runSim() {
+            while ((this.running != null) || this.eventQueue.hasEvent()) {
+                int nextEvent;
+                if (this.eventQueue.hasEvent()){
+                    System.out.println("has more events");
+                    nextEvent = this.eventQueue.peek().time;
+                }
+                else {
+                    System.out.println("no more events");
+                    nextEvent = -1;
+                }
+                if ((this.running != null) && (nextEvent == -1 || nextEvent > this.runningTime + this.clock)){
+                    System.out.println("running and | no more events or next event time is larger than running time plus clock");
+                    this.clock = this.clock + this.runningTime;
+                    this.runningTime = 0;
+                }
+                else {
+                    System.out.println("else of: running and | no more events or next event time is larger than running time plus clock");
+                    if (this.running != null) {
+                        System.out.println("running");
+                        this.runningTime -= nextEvent - this.clock;
+                    }
+                    this.clock = nextEvent;
+                }
+                if ((this.running != null) && this.runningTime == 0) {
+                    System.out.println("running and running time is 0");
+                    if (this.running.activities.isEmpty()) {
+                        System.out.println("no more activities");
+                        this.debug("Process " + this.running.pid + " is exiting");
+                        this.running.stats.finishTime = this.clock;
+                    }
+                    else {
+                        System.out.println("more activities");
+                        int time = this.running.activities.remove(0);
+                        this.debug("Process " + this.running.pid + " is blocking for " + time + " time units");
+                        this.eventQueue.push(new Event(EventType.UNBLOCK, this.running, this.clock + time));
+                    }
+                    this.running = null;
+                }
+                while (this.eventQueue.hasEvent() && this.eventQueue.peek().time == this.clock) {
+                    System.out.println("while events and event queue time is equal to clock");
+                    Event e = this.eventQueue.pop();
+                    Process p = e.process;
+                    if (e.type == EventType.ARRIVAL) {
+                        this.debug("Process " + p.pid + " arrives");
+                        this.rq.add(p);
+                        p.stats.lastReady = this.clock;
+                    }
+                    else {
+                        this.debug("Process " + p.pid + " unblocks");
+                        this.rq.add(p);
+                        p.stats.lastReady = this.clock;
+                    }
+                }
+                if (this.running == null && !this.rq.isEmpty()) {
+                    System.out.println("if not running and rq is empty");
+                    this.debug("Current Ready Queue: " + this.rq);
+                    /////////////
+                    for(int i = 0; i < rq.size(); i++){
+                        Process p = rq.get(i);
+                        if (serviceGiven) {
+                            if (p.sVal == 0){
+                                p.sVal = p.activities.get(0);
+                            }
+                        }
+                        else {
+                            int tVal = p.activities.get(0);
+                            if (p.sVal == 0) {
+                                p.sVal = tVal;
+                            }
+                            else {
+                                p.sVal = alpha * tVal + (1 - alpha) * p.sVal;
+                            }
+                        }
+
+                    }
+                    Process highestPriority = rq.get(0);
+                    int index = 0;
+                    for (int i = 0; i < rq.size(); i++) {
+                        if (rq.get(i).sVal < highestPriority.sVal) {
+                            highestPriority = rq.get(i);
+                            index = i;
+                        }
+                    }
+                    Process p = this.rq.remove(index);
+                    /////////////
+                    //Process p = this.rq.remove(0);
                     p.stats.totalResponseTime = p.stats.totalResponseTime + (this.clock - p.stats.lastReady);
                     p.stats.numResponseTimes = p.stats.numResponseTimes + 1;
                     int cpuTime = p.activities.remove(0);
