@@ -5,20 +5,7 @@ public class Schedule {
     static List<Process> procs = new ArrayList<>();
     public static void main(String[] args) throws IOException {
         procs = readProcesses();
-        System.out.println("NEXT LINE IS PROCS");
-        System.out.println(procs);
-        //FCFSSched fcfsSched = new FCFSSched(procs);
-        //fcfsSched.runSim();
-        //printProcessStats();
-        //RRSched rrSched = new RRSched(procs);
-        //rrSched.runRRSim();
-        //printProcessStats();
-        //FBSched fbSched = new FBSched(procs);
-        //fbSched.runFBSim();
-        //printProcessStats();
         readScheduleType();
-
-
     }
     public static void printProcessStats() {
         double mtt = 0;
@@ -33,10 +20,10 @@ public class Schedule {
             System.out.println("\tTurnaround Time " + p.stats.turnaroundTime());
             System.out.println("\tNormalized Turnaround Time: " + (double) p.stats.turnaroundTime() / p.stats.serviceTime);
             System.out.println("\tAverage Response Time: " + p.stats.avgResponseTime());
-            System.out.println("\t\tTotal response time: " + p.stats.totalResponseTime);
-            System.out.println("\t\tNumber of response times: " + p.stats.numResponseTimes);
+            //System.out.println("\t\tTotal response time: " + p.stats.totalResponseTime);
+            //System.out.println("\t\tNumber of response times: " + p.stats.numResponseTimes);
             mtt += p.stats.turnaroundTime();
-            //mntt += p.stats.turnaroundTime()/p.stats.serviceTime;
+            mntt += (p.stats.turnaroundTime()/p.stats.serviceTime);
             mart += p.stats.avgResponseTime();
         }
         System.out.println("--------------------------");
@@ -50,7 +37,6 @@ public class Schedule {
         FileReader in = new FileReader("./src/SPN.sf");
         BufferedReader reader = new BufferedReader(in);
         String scheduleType = reader.readLine();
-        System.out.println(scheduleType);
         switch (scheduleType) {
             case "FCFS":
                 FCFSSched fcfsSched = new FCFSSched(procs);
@@ -60,7 +46,6 @@ public class Schedule {
             case "RR":
                 String quantumLine = reader.readLine();
                 int quantum = Integer.parseInt(quantumLine.substring(quantumLine.lastIndexOf("=") + 1));
-                System.out.println(quantum);
                 RRSched rrSched = new RRSched(procs, quantum);
                 rrSched.runRRSim();
                 printProcessStats();
@@ -70,8 +55,6 @@ public class Schedule {
                 int numPriorities = Integer.parseInt(prioritiesLine.substring(prioritiesLine.lastIndexOf("=") + 1));
                 quantumLine = reader.readLine();
                 quantum = Integer.parseInt(quantumLine.substring(quantumLine.lastIndexOf("=") + 1));
-                System.out.println(numPriorities);
-                System.out.println(quantum);
                 FBSched fbSched = new FBSched(procs, numPriorities, quantum);
                 fbSched.runFBSim();
                 printProcessStats();
@@ -81,8 +64,6 @@ public class Schedule {
                 boolean serviceGiven = Boolean.parseBoolean(service.substring(service.lastIndexOf("=") + 1));
                 String alphaLine = reader.readLine();
                 double alpha = Double.parseDouble(alphaLine.substring(alphaLine.lastIndexOf("=") + 1));
-                System.out.println(serviceGiven);
-                System.out.println(alpha);
                 SPNSched spnSched = new SPNSched(procs, serviceGiven, alpha);
                 spnSched.runSim();
                 printProcessStats();
@@ -98,7 +79,6 @@ public class Schedule {
         String lineRead;
         int processNum = 0;
         while ((lineRead = reader.readLine()) != null) {
-            System.out.println(lineRead);
             String[] splitLine = lineRead.split(" ");
             loadProcess(procs, processNum, splitLine);
             processNum++;
@@ -111,7 +91,6 @@ public class Schedule {
         for (int i = 1; i < splitLine.length; i++) {
             currentProcess.activities.add(Integer.valueOf(splitLine[i]));
         }
-        System.out.println(currentProcess.activities);
         procs.add(currentProcess);
         return procs;
     }
@@ -145,6 +124,7 @@ public class Schedule {
         Stats stats = null;
         int pid;
         int arrive;
+        boolean timedOut = false;
         List<Integer> activities = new ArrayList<>();
         int queueNum = 0;
         double sVal = 0;
@@ -272,38 +252,27 @@ public class Schedule {
                 p.stats = new Stats(p.arrive);
             }
             for (Process p : this.procs){
-                System.out.println("PRINTING OUT ACTIVITIES MAYBE HOPEFULLY");
                 List<Integer> moddedactivities = new ArrayList<>();
                 for (int i = 0; i < p.activities.size(); i++){
-                    System.out.println("PRINTING MODDED");
                     if (i % 2 == 0) {
                         if(p.activities.get(i) > this.quantum) {
                             int rem = p.activities.get(i);
                             while (rem > this.quantum) {
                                 moddedactivities.add(this.quantum);
-                                System.out.println("1Added " + this.quantum);
                                 rem -= this.quantum;
                                 moddedactivities.add(0);
-                                System.out.println("added blocking for 0 ");
                             }
                             moddedactivities.add(rem);
-                            System.out.println("added rest of rem");
                         }
                         else {
                             moddedactivities.add(p.activities.get(i));
-                            System.out.println("2added " + p.activities.get(i));
                         }
                     }
                     else {
                         moddedactivities.add(p.activities.get(i));
-                        System.out.println("3added " + p.activities.get(i));
                     }
-                    System.out.println("PRINTING MODDED");
-                    System.out.println(moddedactivities);
                 }
                 p.activities = moddedactivities;
-                System.out.println("PRINTING OUT ACTIVITIES MAYBE HOPEFULLY");
-                System.out.println(p.activities);
             }
 
         }
@@ -315,43 +284,40 @@ public class Schedule {
             while ((this.running != null) || this.eventQueue.hasEvent()) {
                 int nextEvent;
                 if (this.eventQueue.hasEvent()){
-                    //System.out.println("has more events");
                     nextEvent = this.eventQueue.peek().time;
                 }
                 else {
-                    //System.out.println("no more events");
                     nextEvent = -1;
                 }
                 if ((this.running != null) && (nextEvent == -1 || nextEvent > this.runningTime + this.clock)){
-                    //System.out.println("running and | no more events or next event time is larger than running time plus clock");
                     this.clock = this.clock + this.runningTime;
                     this.runningTime = 0;
                 }
                 else {
-                    //System.out.println("else of: running and | no more events or next event time is larger than running time plus clock");
                     if (this.running != null) {
-                        //System.out.println("running");
                         this.runningTime -= nextEvent - this.clock;
                     }
                     this.clock = nextEvent;
                 }
                 if ((this.running != null) && this.runningTime == 0) {
-                    //System.out.println("running and running time is 0");
                     if (this.running.activities.isEmpty()) {
-                        //System.out.println("no more activities");
                         this.debug("Process " + this.running.pid + " is exiting");
                         this.running.stats.finishTime = this.clock;
                     }
                     else {
-                        //System.out.println("more activities");
                         int time = this.running.activities.remove(0);
-                        this.debug("Process " + this.running.pid + " is blocking for " + time + " time units");
+                        if (time == 0){
+                            this.debug("Process " + this.running.pid + " timed out");
+                            this.running.timedOut = true;
+                        }
+                        else {
+                            this.debug("Process " + this.running.pid + " is blocking for " + time + " time units");
+                        }
                         this.eventQueue.push(new Event(EventType.UNBLOCK, this.running, this.clock + time));
                     }
                     this.running = null;
                 }
                 while (this.eventQueue.hasEvent() && this.eventQueue.peek().time == this.clock) {
-                    //System.out.println("while events and event queue time is equal to clock");
                     Event e = this.eventQueue.pop();
                     Process p = e.process;
                     if (e.type == EventType.ARRIVAL) {
@@ -360,13 +326,17 @@ public class Schedule {
                         p.stats.lastReady = this.clock;
                     }
                     else {
-                        this.debug("Process " + p.pid + " unblocks");
+                        if (p.timedOut){
+                            p.timedOut = false;
+                        }
+                        else {
+                            this.debug("Process " + p.pid + " unblocks");
+                        }
                         this.rq.add(p);
                         p.stats.lastReady = this.clock;
                     }
                 }
                 if (this.running == null && !this.rq.isEmpty()) {
-                    //System.out.println("if not running and rq is empty");
                     this.debug("Current Ready Queue: " + this.rq);
                     Process p = this.rq.remove(0);
                     p.stats.totalResponseTime = p.stats.totalResponseTime + (this.clock - p.stats.lastReady);
@@ -416,38 +386,27 @@ public class Schedule {
                 p.stats = new Stats(p.arrive);
             }
             for (Process p : this.procs){
-               // System.out.println("PRINTING OUT ACTIVITIES MAYBE HOPEFULLY");
                 List<Integer> moddedactivities = new ArrayList<>();
                 for (int i = 0; i < p.activities.size(); i++){
-                    //System.out.println("PRINTING MODDED");
                     if (i % 2 == 0) {
                         if(p.activities.get(i) > quantum) {
                             int rem = p.activities.get(i);
                             while (rem > quantum) {
                                 moddedactivities.add(quantum);
-                               // System.out.println("1Added " + quantum);
                                 rem -= quantum;
                                 moddedactivities.add(0);
-                                //System.out.println("added blocking for 0 ");
                             }
                             moddedactivities.add(rem);
-                            //System.out.println("added rest of rem");
                         }
                         else {
                             moddedactivities.add(p.activities.get(i));
-                            //System.out.println("2added " + p.activities.get(i));
                         }
                     }
                     else {
                         moddedactivities.add(p.activities.get(i));
-                        //System.out.println("3added " + p.activities.get(i));
                     }
-                    //System.out.println("PRINTING MODDED");
-                    //System.out.println(moddedactivities);
                 }
                 p.activities = moddedactivities;
-                //System.out.println("PRINTING OUT ACTIVITIES MAYBE HOPEFULLY");
-                System.out.println(p.activities);
             }
 
         }
@@ -459,43 +418,40 @@ public class Schedule {
             while ((this.running != null) || this.eventQueue.hasEvent()) {
                 int nextEvent;
                 if (this.eventQueue.hasEvent()){
-                    //System.out.println("has more events");
                     nextEvent = this.eventQueue.peek().time;
                 }
                 else {
-                    //System.out.println("no more events");
                     nextEvent = -1;
                 }
                 if ((this.running != null) && (nextEvent == -1 || nextEvent > this.runningTime + this.clock)){
-                    //System.out.println("running and | no more events or next event time is larger than running time plus clock");
                     this.clock = this.clock + this.runningTime;
                     this.runningTime = 0;
                 }
                 else {
-                    //System.out.println("else of: running and | no more events or next event time is larger than running time plus clock");
                     if (this.running != null) {
-                        //System.out.println("running");
                         this.runningTime -= nextEvent - this.clock;
                     }
                     this.clock = nextEvent;
                 }
                 if ((this.running != null) && this.runningTime == 0) {
-                    //System.out.println("running and running time is 0");
                     if (this.running.activities.isEmpty()) {
-                        //System.out.println("no more activities");
                         this.debug("Process " + this.running.pid + " is exiting");
                         this.running.stats.finishTime = this.clock;
                     }
                     else {
-                        //System.out.println("more activities");
                         int time = this.running.activities.remove(0);
-                        this.debug("Process " + this.running.pid + " is blocking for " + time + " time units");
+                        if (time == 0){
+                            this.debug("Process " + this.running.pid + " timed out");
+                            this.running.timedOut = true;
+                        }
+                        else {
+                            this.debug("Process " + this.running.pid + " is blocking for " + time + " time units");
+                        }
                         this.eventQueue.push(new Event(EventType.UNBLOCK, this.running, this.clock + time));
                     }
                     this.running = null;
                 }
                 while (this.eventQueue.hasEvent() && this.eventQueue.peek().time == this.clock) {
-                    //System.out.println("while events and event queue time is equal to clock");
                     Event e = this.eventQueue.pop();
                     Process p = e.process;
                     if (e.type == EventType.ARRIVAL) {
@@ -504,7 +460,12 @@ public class Schedule {
                         p.stats.lastReady = this.clock;
                     }
                     else {
-                        this.debug("Process " + p.pid + " unblocks");
+                        if (p.timedOut) {
+                            p.timedOut = false;
+                        }
+                        else {
+                            this.debug("Process " + p.pid + " unblocks");
+                        }
                         if (p.queueNum < num_priorities - 1) {
                             p.queueNum += 1;
                         }
@@ -513,7 +474,6 @@ public class Schedule {
                     }
                 }
                 if (this.running == null && !this.queues.isEmpty()) {
-                    //System.out.println("if not running and rq is empty");
                     for (int i = 0; i < this.num_priorities; i++) {
                         if (!this.queues.get(i).isEmpty()) {
                             Process p = this.queues.get(i).remove(0);
@@ -528,8 +488,12 @@ public class Schedule {
                             }
                             p.activities.remove(0);
                             this.runningTime = cpuTime;
+                            p.stats.serviceTime = p.stats.serviceTime + cpuTime;
                             this.running = p;
-                            this.debug("Dispatching " + p.pid + "from queue " + i);
+                            if (p.stats.startTime == null){
+                                p.stats.startTime = this.clock;
+                            }
+                            this.debug("Dispatching Process " + p.pid + " from queue " + i);
                             break;
                         }
                     }
@@ -557,7 +521,6 @@ public class Schedule {
             for (Process p : this.procs) {
                 this.eventQueue.push(new Event(EventType.ARRIVAL, p, p.arrive));
                 p.stats = new Stats(p.arrive);
-                System.out.println("p.stats is " + p.arrive);
             }
         }
 
@@ -569,35 +532,27 @@ public class Schedule {
             while ((this.running != null) || this.eventQueue.hasEvent()) {
                 int nextEvent;
                 if (this.eventQueue.hasEvent()){
-                    System.out.println("has more events");
                     nextEvent = this.eventQueue.peek().time;
                 }
                 else {
-                    System.out.println("no more events");
                     nextEvent = -1;
                 }
                 if ((this.running != null) && (nextEvent == -1 || nextEvent > this.runningTime + this.clock)){
-                    System.out.println("running and | no more events or next event time is larger than running time plus clock");
                     this.clock = this.clock + this.runningTime;
                     this.runningTime = 0;
                 }
                 else {
-                    System.out.println("else of: running and | no more events or next event time is larger than running time plus clock");
                     if (this.running != null) {
-                        System.out.println("running");
                         this.runningTime -= nextEvent - this.clock;
                     }
                     this.clock = nextEvent;
                 }
                 if ((this.running != null) && this.runningTime == 0) {
-                    System.out.println("running and running time is 0");
                     if (this.running.activities.isEmpty()) {
-                        System.out.println("no more activities");
                         this.debug("Process " + this.running.pid + " is exiting");
                         this.running.stats.finishTime = this.clock;
                     }
                     else {
-                        System.out.println("more activities");
                         int time = this.running.activities.remove(0);
                         this.debug("Process " + this.running.pid + " is blocking for " + time + " time units");
                         this.eventQueue.push(new Event(EventType.UNBLOCK, this.running, this.clock + time));
@@ -605,7 +560,6 @@ public class Schedule {
                     this.running = null;
                 }
                 while (this.eventQueue.hasEvent() && this.eventQueue.peek().time == this.clock) {
-                    System.out.println("while events and event queue time is equal to clock");
                     Event e = this.eventQueue.pop();
                     Process p = e.process;
                     if (e.type == EventType.ARRIVAL) {
@@ -620,7 +574,6 @@ public class Schedule {
                     }
                 }
                 if (this.running == null && !this.rq.isEmpty()) {
-                    System.out.println("if not running and rq is empty");
                     this.debug("Current Ready Queue: " + this.rq);
                     Process p = this.rq.remove(0);
                     p.stats.totalResponseTime = p.stats.totalResponseTime + (this.clock - p.stats.lastReady);
@@ -663,7 +616,6 @@ public class Schedule {
             for (Process p : this.procs) {
                 this.eventQueue.push(new Event(EventType.ARRIVAL, p, p.arrive));
                 p.stats = new Stats(p.arrive);
-                System.out.println("p.stats is " + p.arrive);
             }
         }
 
@@ -675,35 +627,27 @@ public class Schedule {
             while ((this.running != null) || this.eventQueue.hasEvent()) {
                 int nextEvent;
                 if (this.eventQueue.hasEvent()){
-                    System.out.println("has more events");
                     nextEvent = this.eventQueue.peek().time;
                 }
                 else {
-                    System.out.println("no more events");
                     nextEvent = -1;
                 }
                 if ((this.running != null) && (nextEvent == -1 || nextEvent > this.runningTime + this.clock)){
-                    System.out.println("running and | no more events or next event time is larger than running time plus clock");
                     this.clock = this.clock + this.runningTime;
                     this.runningTime = 0;
                 }
                 else {
-                    System.out.println("else of: running and | no more events or next event time is larger than running time plus clock");
                     if (this.running != null) {
-                        System.out.println("running");
                         this.runningTime -= nextEvent - this.clock;
                     }
                     this.clock = nextEvent;
                 }
                 if ((this.running != null) && this.runningTime == 0) {
-                    System.out.println("running and running time is 0");
                     if (this.running.activities.isEmpty()) {
-                        System.out.println("no more activities");
                         this.debug("Process " + this.running.pid + " is exiting");
                         this.running.stats.finishTime = this.clock;
                     }
                     else {
-                        System.out.println("more activities");
                         int time = this.running.activities.remove(0);
                         this.debug("Process " + this.running.pid + " is blocking for " + time + " time units");
                         this.eventQueue.push(new Event(EventType.UNBLOCK, this.running, this.clock + time));
@@ -711,7 +655,6 @@ public class Schedule {
                     this.running = null;
                 }
                 while (this.eventQueue.hasEvent() && this.eventQueue.peek().time == this.clock) {
-                    System.out.println("while events and event queue time is equal to clock");
                     Event e = this.eventQueue.pop();
                     Process p = e.process;
                     if (e.type == EventType.ARRIVAL) {
@@ -726,7 +669,6 @@ public class Schedule {
                     }
                 }
                 if (this.running == null && !this.rq.isEmpty()) {
-                    System.out.println("if not running and rq is empty");
                     this.debug("Current Ready Queue: " + this.rq);
                     /////////////
                     for(int i = 0; i < rq.size(); i++){
@@ -757,7 +699,6 @@ public class Schedule {
                     }
                     Process p = this.rq.remove(index);
                     /////////////
-                    //Process p = this.rq.remove(0);
                     p.stats.totalResponseTime = p.stats.totalResponseTime + (this.clock - p.stats.lastReady);
                     p.stats.numResponseTimes = p.stats.numResponseTimes + 1;
                     int cpuTime = p.activities.remove(0);
