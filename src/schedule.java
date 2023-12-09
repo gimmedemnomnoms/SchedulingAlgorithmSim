@@ -1,13 +1,18 @@
 import java.util.ArrayList;
 import java.util.List;
 import java.io.*;
-public class Schedule {
+public class schedule {
     static List<Process> procs = new ArrayList<>();
     public static void main(String[] args) throws IOException {
+        if (args.length < 2) {
+            System.out.println("Please provide the process file and schedule file");
+        }
+        String processFile = args[0];
+        String scheduleFile = args[1];
         //read in process information from file and store in list
-        procs = readProcesses();
+        procs = readProcesses(processFile);
         //read in files with information about schedule
-        readScheduleType();
+        readScheduleType(scheduleFile);
     }
     // function to print out stats for each process after running the simulation
     public static void printProcessStats() {
@@ -34,63 +39,78 @@ public class Schedule {
 
     }
 
-    public static void readScheduleType() throws IOException {
-        FileReader in = new FileReader("./src/SPN.sf");
-        BufferedReader reader = new BufferedReader(in);
-        String scheduleType = reader.readLine();
+    public static void readScheduleType(String scheduleFile) throws IOException {
+        //FileReader in = new FileReader("./src/SPN.sf");
+        //BufferedReader reader = new BufferedReader(in);
+        //String scheduleType = reader.readLine();
+        File file = new File(scheduleFile);
+        if (!file.exists()) {
+            System.out.println("File not found");
+        }
+        try (FileReader in = new FileReader(file); BufferedReader reader = new BufferedReader(in)) {
+            String scheduleType = reader.readLine();
+            // read and store different variables based on different schedule types, and run simulation for that schedule type
+            switch (scheduleType) {
+                case "FCFS":
+                    FCFSSched fcfsSched = new FCFSSched(procs);
+                    fcfsSched.runSim();
+                    printProcessStats();
+                    break;
+                case "RR":
+                    String quantumLine = reader.readLine();
+                    // extract quantum value from line
+                    int quantum = Integer.parseInt(quantumLine.substring(quantumLine.lastIndexOf("=") + 1));
+                    RRSched rrSched = new RRSched(procs, quantum);
+                    rrSched.runRRSim();
+                    printProcessStats();
+                    break;
+                case "FEEDBACK":
+                    String prioritiesLine = reader.readLine();
+                    // extract number of priorities from line
+                    int numPriorities = Integer.parseInt(prioritiesLine.substring(prioritiesLine.lastIndexOf("=") + 1));
+                    quantumLine = reader.readLine();
+                    // extract quantum value from line
+                    quantum = Integer.parseInt(quantumLine.substring(quantumLine.lastIndexOf("=") + 1));
+                    FBSched fbSched = new FBSched(procs, numPriorities, quantum);
+                    fbSched.runFBSim();
+                    printProcessStats();
+                    break;
+                case "SPN":
+                    String service = reader.readLine();
+                    //extract boolean value of serviceGiven
+                    boolean serviceGiven = Boolean.parseBoolean(service.substring(service.lastIndexOf("=") + 1));
+                    String alphaLine = reader.readLine();
+                    // extract alpha value
+                    double alpha = Double.parseDouble(alphaLine.substring(alphaLine.lastIndexOf("=") + 1));
+                    SPNSched spnSched = new SPNSched(procs, serviceGiven, alpha);
+                    spnSched.runSim();
+                    printProcessStats();
+                    break;
+            }
 
-        // read and store different variables based on different schedule types, and run simulation for that schedule type
-        switch (scheduleType) {
-            case "FCFS":
-                FCFSSched fcfsSched = new FCFSSched(procs);
-                fcfsSched.runSim();
-                printProcessStats();
-                break;
-            case "RR":
-                String quantumLine = reader.readLine();
-                // extract quantum value from line
-                int quantum = Integer.parseInt(quantumLine.substring(quantumLine.lastIndexOf("=") + 1));
-                RRSched rrSched = new RRSched(procs, quantum);
-                rrSched.runRRSim();
-                printProcessStats();
-                break;
-            case "FEEDBACK":
-                String prioritiesLine = reader.readLine();
-                // extract number of priorities from line
-                int numPriorities = Integer.parseInt(prioritiesLine.substring(prioritiesLine.lastIndexOf("=") + 1));
-                quantumLine = reader.readLine();
-                // extract quantum value from line
-                quantum = Integer.parseInt(quantumLine.substring(quantumLine.lastIndexOf("=") + 1));
-                FBSched fbSched = new FBSched(procs, numPriorities, quantum);
-                fbSched.runFBSim();
-                printProcessStats();
-                break;
-            case "SPN":
-                String service = reader.readLine();
-                //extract boolean value of serviceGiven
-                boolean serviceGiven = Boolean.parseBoolean(service.substring(service.lastIndexOf("=") + 1));
-                String alphaLine = reader.readLine();
-                // extract alpha value
-                double alpha = Double.parseDouble(alphaLine.substring(alphaLine.lastIndexOf("=") + 1));
-                SPNSched spnSched = new SPNSched(procs, serviceGiven, alpha);
-                spnSched.runSim();
-                printProcessStats();
-                break;
         }
     }
-    public static List<Process> readProcesses() throws IOException {
-        FileReader in = new FileReader("./src/medium.txt");
-        BufferedReader reader = new BufferedReader(in);
-        String lineRead;
-        int processNum = 0;
-        while ((lineRead = reader.readLine()) != null) {
-            String[] splitLine = lineRead.split(" ");
-            //pass process information to function to create process and add to list
-            loadProcess(procs, processNum, splitLine);
-            // counter used to name processes
-            processNum++;
+    public static List<Process> readProcesses(String processFile) throws IOException {
+        //FileReader in = new FileReader("./src/medium.txt");
+        //BufferedReader reader = new BufferedReader(in);
+
+        File file = new File(processFile);
+        if (!file.exists()) {
+            System.out.println("File not found");
         }
-        return procs;
+
+        try (FileReader in = new FileReader(file); BufferedReader reader = new BufferedReader(in)) {
+            String lineRead;
+            int processNum = 0;
+            while ((lineRead = reader.readLine()) != null) {
+                String[] splitLine = lineRead.split(" ");
+                //pass process information to function to create process and add to list
+                loadProcess(procs, processNum, splitLine);
+                // counter used to name processes
+                processNum++;
+            }
+            return procs;
+        }
     }
     public static List<Process> loadProcess(List<Process> procs, int processNum, String [] splitLine){
         Process currentProcess = new Process(processNum);
