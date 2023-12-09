@@ -4,15 +4,17 @@ import java.io.*;
 public class Schedule {
     static List<Process> procs = new ArrayList<>();
     public static void main(String[] args) throws IOException {
+        //read in process information from file and store in list
         procs = readProcesses();
+        //read in files with information about schedule
         readScheduleType();
     }
+    // function to print out stats for each process after running the simulation
     public static void printProcessStats() {
         double mtt = 0;
         double mntt = 0;
         double mart = 0;
-        for (int i = 0; i < procs.size(); i++) {
-            Process p = procs.get(i);
+        for (Process p : procs) {
             System.out.println("Process " + p.pid);
             System.out.println("\tStart Time: " + p.stats.startTime);
             System.out.println("\tFinish Time: " + p.stats.finishTime);
@@ -20,12 +22,11 @@ public class Schedule {
             System.out.println("\tTurnaround Time " + p.stats.turnaroundTime());
             System.out.println("\tNormalized Turnaround Time: " + (double) p.stats.turnaroundTime() / p.stats.serviceTime);
             System.out.println("\tAverage Response Time: " + p.stats.avgResponseTime());
-            //System.out.println("\t\tTotal response time: " + p.stats.totalResponseTime);
-            //System.out.println("\t\tNumber of response times: " + p.stats.numResponseTimes);
             mtt += p.stats.turnaroundTime();
-            mntt += (p.stats.turnaroundTime()/p.stats.serviceTime);
+            mntt = mntt + p.stats.turnaroundTime() / p.stats.serviceTime;
             mart += p.stats.avgResponseTime();
         }
+        // calculate mean values for all processes
         System.out.println("--------------------------");
         System.out.println("Mean Turnaround Time: " + mtt / procs.size());
         System.out.println("Mean Normalized Turnaround Time: " + mntt / procs.size());
@@ -37,6 +38,8 @@ public class Schedule {
         FileReader in = new FileReader("./src/SPN.sf");
         BufferedReader reader = new BufferedReader(in);
         String scheduleType = reader.readLine();
+
+        // read and store different variables based on different schedule types, and run simulation for that schedule type
         switch (scheduleType) {
             case "FCFS":
                 FCFSSched fcfsSched = new FCFSSched(procs);
@@ -45,6 +48,7 @@ public class Schedule {
                 break;
             case "RR":
                 String quantumLine = reader.readLine();
+                // extract quantum value from line
                 int quantum = Integer.parseInt(quantumLine.substring(quantumLine.lastIndexOf("=") + 1));
                 RRSched rrSched = new RRSched(procs, quantum);
                 rrSched.runRRSim();
@@ -52,8 +56,10 @@ public class Schedule {
                 break;
             case "FEEDBACK":
                 String prioritiesLine = reader.readLine();
+                // extract number of priorities from line
                 int numPriorities = Integer.parseInt(prioritiesLine.substring(prioritiesLine.lastIndexOf("=") + 1));
                 quantumLine = reader.readLine();
+                // extract quantum value from line
                 quantum = Integer.parseInt(quantumLine.substring(quantumLine.lastIndexOf("=") + 1));
                 FBSched fbSched = new FBSched(procs, numPriorities, quantum);
                 fbSched.runFBSim();
@@ -61,8 +67,10 @@ public class Schedule {
                 break;
             case "SPN":
                 String service = reader.readLine();
+                //extract boolean value of serviceGiven
                 boolean serviceGiven = Boolean.parseBoolean(service.substring(service.lastIndexOf("=") + 1));
                 String alphaLine = reader.readLine();
+                // extract alpha value
                 double alpha = Double.parseDouble(alphaLine.substring(alphaLine.lastIndexOf("=") + 1));
                 SPNSched spnSched = new SPNSched(procs, serviceGiven, alpha);
                 spnSched.runSim();
@@ -71,26 +79,28 @@ public class Schedule {
         }
     }
     public static List<Process> readProcesses() throws IOException {
-        //File inputFile = new File("./src/medium.txt");
-        FileReader in = new FileReader(new File("./src/medium.txt"));
-        //FileInputStream fstream = new FileInputStream("C:\\Users\\alina\\Documents\\Classes\\Fall 2023\\Operating Systems\\Project 3\\scheduling\\src\\medium.txt");
-        //DataInputStream input = new DataInputStream(fstream);
+        FileReader in = new FileReader("./src/medium.txt");
         BufferedReader reader = new BufferedReader(in);
         String lineRead;
         int processNum = 0;
         while ((lineRead = reader.readLine()) != null) {
             String[] splitLine = lineRead.split(" ");
+            //pass process information to function to create process and add to list
             loadProcess(procs, processNum, splitLine);
+            // counter used to name processes
             processNum++;
         }
         return procs;
     }
     public static List<Process> loadProcess(List<Process> procs, int processNum, String [] splitLine){
         Process currentProcess = new Process(processNum);
+        // first value in the line is the arrival time, store in variable
         currentProcess.arrive = Integer.parseInt(splitLine[0]);
+        // rest of values are activity times, store in list
         for (int i = 1; i < splitLine.length; i++) {
             currentProcess.activities.add(Integer.valueOf(splitLine[i]));
         }
+        // add process to list
         procs.add(currentProcess);
         return procs;
     }
@@ -121,12 +131,16 @@ public class Schedule {
     }
 
     static class Process {
-        Stats stats = null;
+        Stats stats = null; // to be added by scheduler
         int pid;
         int arrive;
+        // used to differentiate a process timing out from blocking
         boolean timedOut = false;
+        // holds value for CPU and I/O activity times
         List<Integer> activities = new ArrayList<>();
+        // holds number of queues for feedback schedule
         int queueNum = 0;
+        // holds s for SPN schedule
         double sVal = 0;
 
         public Process(int pid) {
@@ -144,6 +158,7 @@ public class Schedule {
     }
 
     static class Event implements Comparable<Event> {
+        // an event has a type, associated process, and the time it happens
         EventType type;
         Process process;
         int time;
@@ -157,7 +172,9 @@ public class Schedule {
         @Override
         public int compareTo(Event other) {
             if (this.time == other.time) {
+                // break tie with event type
                 if (this.type == other.type) {
+                    // break tie by pid
                     return Integer.compare(this.process.pid, other.process.pid);
                 }
                 else {
@@ -175,12 +192,13 @@ public class Schedule {
         }
     }
 
+    // a priority queue to sort events
     static class EventQueue {
         List<Event> queue = new ArrayList<>();
         boolean dirty = false;
 
         void push(Event item ) {
-            if (item instanceof Event) {
+            if (item != null) {
                 queue.add(item);
                 dirty = true;
             }
@@ -207,9 +225,6 @@ public class Schedule {
             return queue.get(0);
         }
 
-        boolean empty() {
-            return queue.isEmpty();
-        }
         boolean hasEvent() {
             return !queue.isEmpty();
         }
@@ -251,33 +266,44 @@ public class Schedule {
                 this.eventQueue.push(new Event(EventType.ARRIVAL, p, p.arrive));
                 p.stats = new Stats(p.arrive);
             }
+            // before running, creates a new activity list that splits CPU activity times by the quantum and adds a wait of 0 immediately after
+            // to simulate round robin with a time quantum
             for (Process p : this.procs){
                 List<Integer> moddedactivities = new ArrayList<>();
                 for (int i = 0; i < p.activities.size(); i++){
+                    // even index indicates CPU activity
                     if (i % 2 == 0) {
+                        // if the CPU activity time is larger than the quantum, divide it into quantum sizes
                         if(p.activities.get(i) > this.quantum) {
+                            // holds the "remaining" activity time after removing one quantum value at a time
                             int rem = p.activities.get(i);
                             while (rem > this.quantum) {
+                                // add a quantum size activity to the list
                                 moddedactivities.add(this.quantum);
                                 rem -= this.quantum;
+                                // add a "wait" of 0 to indicate a time out
                                 moddedactivities.add(0);
                             }
+                            // once the remainder is less than the quantum size, add to list
                             moddedactivities.add(rem);
                         }
+                        // the CPU activity time is less than the quantum value, does not need to be split
                         else {
                             moddedactivities.add(p.activities.get(i));
                         }
                     }
+                    // odd indexes are block time and do not need to be split
                     else {
                         moddedactivities.add(p.activities.get(i));
                     }
                 }
+                // reassign variable to hold the new list
                 p.activities = moddedactivities;
             }
 
         }
         void debug (String msg) {
-            System.out.println(this.clock + " " + msg);
+            System.out.println("[" + this.clock + "]" + " " + msg);
         }
 
         void runRRSim() {
@@ -306,10 +332,12 @@ public class Schedule {
                     }
                     else {
                         int time = this.running.activities.remove(0);
+                        // if the block time is 0, then the process timed out
                         if (time == 0){
                             this.debug("Process " + this.running.pid + " timed out");
                             this.running.timedOut = true;
                         }
+                        // if not 0, then block
                         else {
                             this.debug("Process " + this.running.pid + " is blocking for " + time + " time units");
                         }
@@ -317,6 +345,7 @@ public class Schedule {
                     }
                     this.running = null;
                 }
+                // Do all events that happen at the same time
                 while (this.eventQueue.hasEvent() && this.eventQueue.peek().time == this.clock) {
                     Event e = this.eventQueue.pop();
                     Process p = e.process;
@@ -326,9 +355,11 @@ public class Schedule {
                         p.stats.lastReady = this.clock;
                     }
                     else {
+                        // if the process was timed out, reset
                         if (p.timedOut){
                             p.timedOut = false;
                         }
+                        // only prints when a process was truly blocked, not timed out
                         else {
                             this.debug("Process " + p.pid + " unblocks");
                         }
@@ -377,6 +408,7 @@ public class Schedule {
             this.runningTime = 0;
             this.running = null;
 
+            // create a queue for each priority level
             for (int i = 0; i < num_priorities; i++){
                 this.queues.add(new ArrayList<>());
              }
@@ -385,34 +417,45 @@ public class Schedule {
                 this.eventQueue.push(new Event(EventType.ARRIVAL, p, p.arrive));
                 p.stats = new Stats(p.arrive);
             }
+            // before running, creates a new activity list that splits CPU activity times by the quantum and adds a wait of 0 immediately after
+            // to simulate Feedback with a time quantum
             for (Process p : this.procs){
                 List<Integer> moddedactivities = new ArrayList<>();
                 for (int i = 0; i < p.activities.size(); i++){
+                    // even index indicates CPU activity
                     if (i % 2 == 0) {
+                        // if the CPU activity time is larger than the quantum, divide it into quantum sizes
                         if(p.activities.get(i) > quantum) {
                             int rem = p.activities.get(i);
+                            // holds the "remaining" activity time after removing one quantum value at a time
                             while (rem > quantum) {
+                                // add a quantum size activity to the list
                                 moddedactivities.add(quantum);
                                 rem -= quantum;
+                                // add a "wait" of 0 to indicate a time out
                                 moddedactivities.add(0);
                             }
+                            // once the remainder is less than the quantum size, add to list
                             moddedactivities.add(rem);
                         }
+                        // the CPU activity time is less than the quantum value, does not need to be split
                         else {
                             moddedactivities.add(p.activities.get(i));
                         }
                     }
+                    // odd indexes are block time and do not need to be split
                     else {
                         moddedactivities.add(p.activities.get(i));
                     }
                 }
+                // reassign variable to hold the new list
                 p.activities = moddedactivities;
             }
 
         }
 
         void debug (String msg) {
-            System.out.println(this.clock + " " + msg);
+            System.out.println("[" + this.clock + "]" + " " + msg);
         }
         void runFBSim() {
             while ((this.running != null) || this.eventQueue.hasEvent()) {
@@ -440,10 +483,12 @@ public class Schedule {
                     }
                     else {
                         int time = this.running.activities.remove(0);
+                        // if the block time is 0, then the process timed out
                         if (time == 0){
                             this.debug("Process " + this.running.pid + " timed out");
                             this.running.timedOut = true;
                         }
+                        // if not 0, then block
                         else {
                             this.debug("Process " + this.running.pid + " is blocking for " + time + " time units");
                         }
@@ -451,6 +496,7 @@ public class Schedule {
                     }
                     this.running = null;
                 }
+                // Do all events that happen at the same time
                 while (this.eventQueue.hasEvent() && this.eventQueue.peek().time == this.clock) {
                     Event e = this.eventQueue.pop();
                     Process p = e.process;
@@ -460,12 +506,16 @@ public class Schedule {
                         p.stats.lastReady = this.clock;
                     }
                     else {
+                        // if the process was timed out, reset
+
                         if (p.timedOut) {
                             p.timedOut = false;
                         }
+                        // only prints when a process was truly blocked, not timed out
                         else {
                             this.debug("Process " + p.pid + " unblocks");
                         }
+                        // lower the priority number if applicable
                         if (p.queueNum < num_priorities - 1) {
                             p.queueNum += 1;
                         }
@@ -474,6 +524,7 @@ public class Schedule {
                     }
                 }
                 if (this.running == null && !this.queues.isEmpty()) {
+                    // starting with the highest priority queue, look for next process
                     for (int i = 0; i < this.num_priorities; i++) {
                         if (!this.queues.get(i).isEmpty()) {
                             Process p = this.queues.get(i).remove(0);
@@ -525,7 +576,7 @@ public class Schedule {
         }
 
         void debug (String msg) {
-            System.out.println(this.clock + " " + msg);
+            System.out.println("[" + this.clock + "]" + " " + msg);
         }
 
         void runSim() {
@@ -559,6 +610,7 @@ public class Schedule {
                     }
                     this.running = null;
                 }
+                // Do all events that happen at the same time
                 while (this.eventQueue.hasEvent() && this.eventQueue.peek().time == this.clock) {
                     Event e = this.eventQueue.pop();
                     Process p = e.process;
@@ -620,7 +672,7 @@ public class Schedule {
         }
 
         void debug (String msg) {
-            System.out.println(this.clock + " " + msg);
+            System.out.println("[" + this.clock + "]" + " " + msg);
         }
 
         void runSim() {
@@ -654,6 +706,7 @@ public class Schedule {
                     }
                     this.running = null;
                 }
+                // Do all events that happen at the same time
                 while (this.eventQueue.hasEvent() && this.eventQueue.peek().time == this.clock) {
                     Event e = this.eventQueue.pop();
                     Process p = e.process;
@@ -670,25 +723,27 @@ public class Schedule {
                 }
                 if (this.running == null && !this.rq.isEmpty()) {
                     this.debug("Current Ready Queue: " + this.rq);
-                    /////////////
-                    for(int i = 0; i < rq.size(); i++){
-                        Process p = rq.get(i);
+                    // calculate estimated service time for every process in the ready queue
+                    for (Process p : rq) {
+                        // if true, service time is duration of the first CPU activity
                         if (serviceGiven) {
-                            if (p.sVal == 0){
+                            if (p.sVal == 0) {
                                 p.sVal = p.activities.get(0);
                             }
                         }
+                        // if false, use exponential average to estimate
                         else {
                             int tVal = p.activities.get(0);
+                            // use first CPU activity time for first calculation
                             if (p.sVal == 0) {
                                 p.sVal = tVal;
-                            }
-                            else {
+                            } else {
                                 p.sVal = alpha * tVal + (1 - alpha) * p.sVal;
                             }
                         }
 
                     }
+                    // compares estimated service times, dispatches shortest
                     Process highestPriority = rq.get(0);
                     int index = 0;
                     for (int i = 0; i < rq.size(); i++) {
@@ -698,7 +753,6 @@ public class Schedule {
                         }
                     }
                     Process p = this.rq.remove(index);
-                    /////////////
                     p.stats.totalResponseTime = p.stats.totalResponseTime + (this.clock - p.stats.lastReady);
                     p.stats.numResponseTimes = p.stats.numResponseTimes + 1;
                     int cpuTime = p.activities.remove(0);
